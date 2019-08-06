@@ -21,6 +21,7 @@ import io.ktor.routing.routing
 import io.ktor.sessions.Sessions
 import io.ktor.sessions.cookie
 import io.ktor.util.date.GMTDate
+import org.koin.ktor.ext.Koin
 import org.slf4j.event.Level
 import java.time.Duration
 import kotlin.collections.set
@@ -30,7 +31,12 @@ fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
 @Suppress("unused") // Referenced in application.conf
 @kotlin.jvm.JvmOverloads
 fun Application.module(testing: Boolean = false) {
+
     val client = HttpClient(Apache) {
+    }
+
+    install(Koin) {
+        modules(koinModule)
     }
 
     install(ContentNegotiation) {

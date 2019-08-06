@@ -42,5 +42,7 @@ dependencies {
     compile "io.ktor:ktor-metrics:$ktor_version"
     compile "io.ktor:ktor-server-sessions:$ktor_version"
     compile "io.ktor:ktor-websockets:$ktor_version"
+    compile "org.koin:koin-ktor:2.0.1"
+    compile "org.koin:koin-test:2.0.1"
     testCompile "io.ktor:ktor-server-tests:$ktor_version"
 }
