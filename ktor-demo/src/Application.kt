@@ -4,46 +4,32 @@ import io.ktor.application.*
 import io.ktor.response.*
 import io.ktor.request.*
 import io.ktor.client.*
-import io.ktor.client.engine.jetty.*
-import io.ktor.client.features.json.*
-import io.ktor.client.request.*
-import kotlinx.coroutines.*
-import io.ktor.client.features.logging.*
+import io.ktor.client.engine.apache.*
 import io.ktor.routing.*
 import io.ktor.http.*
 import io.ktor.content.*
 import io.ktor.http.content.*
+import io.ktor.gson.*
+import io.ktor.features.*
 import io.ktor.locations.*
 import io.ktor.sessions.*
-import io.ktor.features.*
 import org.slf4j.event.*
 import io.ktor.util.date.*
 import io.ktor.websocket.*
 import io.ktor.http.cio.websocket.*
 import java.time.*
 
-fun main(args: Array<String>): Unit = io.ktor.server.tomcat.EngineMain.main(args)
+fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
 
 @Suppress("unused") // Referenced in application.conf
 @kotlin.jvm.JvmOverloads
 fun Application.module(testing: Boolean = false) {
-    val client = HttpClient(Jetty) {
-        install(JsonFeature) {
-            serializer = GsonSerializer()
-        }
-        install(Logging) {
-            level = LogLevel.HEADERS
-        }
+    val client = HttpClient(Apache) {
     }
-    runBlocking {
-        // Sample for making a HTTP Client request
-        /*
-        val message = client.post<JsonSampleClass> {
-            url("http://127.0.0.1:8080/path/to/endpoint")
-            contentType(ContentType.Application.Json)
-            body = JsonSampleClass(hello = "world")
+
+    install(ContentNegotiation) {
+        gson {
         }
-        */
     }
 
     install(Locations) {
@@ -89,6 +75,9 @@ fun Application.module(testing: Boolean = false) {
         header("X-Engine", "Ktor") // will send this header with each response
     }
 
+    install(ForwardedHeaderSupport) // WARNING: for security, do not include this if not behind a reverse proxy
+    install(XForwardedHeaderSupport) // WARNING: for security, do not include this if not behind a reverse proxy
+
     install(io.ktor.websocket.WebSockets) {
         pingPeriod = Duration.ofSeconds(15)
         timeout = Duration.ofSeconds(15)
@@ -110,6 +99,10 @@ fun Application.module(testing: Boolean = false) {
         // Static feature. Try to access `/static/ktor_logo.svg`
         static("/static") {
             resources("static")
+        }
+
+        get("/json/gson") {
+            call.respond(mapOf("hello" to "world"))
         }
 
         get<MyLocation> {
@@ -150,8 +143,6 @@ fun Application.module(testing: Boolean = false) {
         }
     }
 }
-
-data class JsonSampleClass(val hello: String)
 
 @Location("/location/{name}")
 class MyLocation(val name: String, val arg1: Int = 42, val arg2: String = "default")
