@@ -1,23 +1,29 @@
 package com.example
 
-import io.ktor.application.*
-import io.ktor.response.*
-import io.ktor.request.*
-import io.ktor.client.*
-import io.ktor.client.engine.apache.*
-import io.ktor.routing.*
-import io.ktor.http.*
-import io.ktor.content.*
-import io.ktor.http.content.*
-import io.ktor.gson.*
+import com.example.Models.MySession
+import com.example.Routing.*
+import io.ktor.application.Application
+import io.ktor.application.call
+import io.ktor.application.install
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.apache.Apache
 import io.ktor.features.*
-import io.ktor.locations.*
-import io.ktor.sessions.*
-import org.slf4j.event.*
-import io.ktor.util.date.*
-import io.ktor.websocket.*
-import io.ktor.http.cio.websocket.*
-import java.time.*
+import io.ktor.gson.gson
+import io.ktor.http.CacheControl
+import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.CachingOptions
+import io.ktor.locations.Locations
+import io.ktor.request.path
+import io.ktor.response.respond
+import io.ktor.routing.Routing
+import io.ktor.routing.routing
+import io.ktor.sessions.Sessions
+import io.ktor.sessions.cookie
+import io.ktor.util.date.GMTDate
+import org.slf4j.event.Level
+import java.time.Duration
+import kotlin.collections.set
 
 fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
 
@@ -63,7 +69,10 @@ fun Application.module(testing: Boolean = false) {
     install(CachingHeaders) {
         options { outgoingContent ->
             when (outgoingContent.contentType?.withoutParameters()) {
-                ContentType.Text.CSS -> CachingOptions(CacheControl.MaxAge(maxAgeSeconds = 24 * 60 * 60), expires = null as? GMTDate?)
+                ContentType.Text.CSS -> CachingOptions(
+                    CacheControl.MaxAge(maxAgeSeconds = 24 * 60 * 60),
+                    expires = null as? GMTDate?
+                )
                 else -> null
             }
         }
@@ -91,37 +100,15 @@ fun Application.module(testing: Boolean = false) {
         maxRangeCount = 10
     }
 
+    install(Routing) {
+        basic()
+        location()
+        session()
+        static()
+        webSocket()
+    }
+
     routing {
-        get("/") {
-            call.respondText("HELLO WORLD!", contentType = ContentType.Text.Plain)
-        }
-
-        // Static feature. Try to access `/static/ktor_logo.svg`
-        static("/static") {
-            resources("static")
-        }
-
-        get("/json/gson") {
-            call.respond(mapOf("hello" to "world"))
-        }
-
-        get<MyLocation> {
-            call.respondText("Location: name=${it.name}, arg1=${it.arg1}, arg2=${it.arg2}")
-        }
-        // Register nested routes
-        get<Type.Edit> {
-            call.respondText("Inside $it")
-        }
-        get<Type.List> {
-            call.respondText("Inside $it")
-        }
-
-        get("/session/increment") {
-            val session = call.sessions.get<MySession>() ?: MySession()
-            call.sessions.set(session.copy(count = session.count + 1))
-            call.respondText("Counter is ${session.count}. Refresh to increment.")
-        }
-
         install(StatusPages) {
             exception<AuthenticationException> { cause ->
                 call.respond(HttpStatusCode.Unauthorized)
@@ -131,31 +118,9 @@ fun Application.module(testing: Boolean = false) {
             }
 
         }
-
-        webSocket("/myws/echo") {
-            send(Frame.Text("Hi from server"))
-            while (true) {
-                val frame = incoming.receive()
-                if (frame is Frame.Text) {
-                    send(Frame.Text("Client said: " + frame.readText()))
-                }
-            }
-        }
     }
 }
 
-@Location("/location/{name}")
-class MyLocation(val name: String, val arg1: Int = 42, val arg2: String = "default")
-
-@Location("/type/{name}") data class Type(val name: String) {
-    @Location("/edit")
-    data class Edit(val type: Type)
-
-    @Location("/list/{page}")
-    data class List(val type: Type, val page: Int)
-}
-
-data class MySession(val count: Int = 0)
 
 class AuthenticationException : RuntimeException()
 class AuthorizationException : RuntimeException()
